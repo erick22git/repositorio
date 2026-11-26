@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Consulta de multas</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 20px auto; }
+    input, button { padding: 6px; margin: 4px 0; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #999; padding: 6px; }
+  </style>
+</head>
+<body>
+  <h2>Consulta de multas</h2>
+  <input id="ci" placeholder="CI del conductor" value="11021654">
+  <button onclick="consultar()">Consultar</button>
+  <p id="mensaje"></p>
+  <table>
+    <thead><tr><th>Boleta</th><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead>
+    <tbody id="filas"></tbody>
+  </table>
+
+  <script>
+    const API = 'http://localhost:8000/api/multas';
+
+    async function consultar() {
+      const ci = document.getElementById('ci').value.trim();
+      const mensaje = document.getElementById('mensaje');
+      const filas = document.getElementById('filas');
+      filas.innerHTML = '';
+      if (!ci) { mensaje.textContent = 'Escribe un CI'; return; }
+
+      try {
+        const r = await fetch(API + '?ci=' + encodeURIComponent(ci), { headers: { Accept: 'application/json' } });
+        if (!r.ok) { mensaje.textContent = 'Error HTTP ' + r.status; return; }
+        const multas = await r.json();
+        mensaje.textContent = multas.length ? multas.length + ' multa(s)' : 'No tiene multas registradas';
+        for (const m of multas) {
+          const tr = filas.insertRow();
+          // textContent: los datos se muestran como texto, nunca como HTML
+          for (const valor of [m.codigo, m.fecha, m.tipo, m.monto, m.estado]) {
+            tr.insertCell().textContent = valor;
+          }
+        }
+      } catch (e) {
+        mensaje.textContent = 'No se pudo conectar con la Central: ' + e.message;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reservas</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
+    input, select, button { padding: 6px; margin: 4px 0; }
+    pre { background: #f2f2f2; padding: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Motor de reservas</h2>
+
+  <input id="email" value="admin@test.com">
+  <input id="password" type="password" value="123456">
+  <button id="entrar" onclick="entrar()">Entrar</button>
+
+  <h3>Reservar</h3>
+  <input id="fecha" type="date">
+  <input id="idHuesped" placeholder="id huesped" value="H1">
+  <input id="codHabitacion" placeholder="codigo habitacion" value="A101">
+  <select id="hotelDestino">
+    <option value="A">A - Gran Sucre (REST)</option>
+    <option value="B">B - Mirador Andino (GraphQL)</option>
+  </select>
+  <input id="noches" type="number" min="1" value="2">
+  <button id="reservar" onclick="reservar()">Reservar</button>
+
+  <pre id="salida">Primero inicia sesion</pre>
+
+  <script>
+    const API = 'http://localhost:8000/api';
+    let token = '';
+    const valor = id => document.getElementById(id).value.trim();
+    const mostrar = texto => document.getElementById('salida').textContent = texto;
+    document.getElementById('fecha').value = new Date().toISOString().slice(0, 10);
+
+    async function enviar(ruta, cuerpo) {
+      const headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = 'Bearer ' + token;
+      const r = await fetch(API + ruta, { method: 'POST', headers, body: JSON.stringify(cuerpo) });
+      return { codigo: r.status, datos: await r.json() };
+    }
+
+    async function entrar() {
+      try {
+        const r = await enviar('/login', { email: valor('email'), password: valor('password') });
+        token = r.datos.token || '';
+        mostrar(token ? 'Sesion iniciada' : 'Error ' + r.codigo + ': ' + r.datos.error);
+      } catch (e) { mostrar('El motor no responde: ' + e.message); }
+    }
+
+    async function reservar() {
+      try {
+        const r = await enviar('/reserva', {
+          fecha: valor('fecha'), idHuesped: valor('idHuesped'), codHabitacion: valor('codHabitacion'),
+          hotelDestino: valor('hotelDestino'), noches: Number(valor('noches'))
+        });
+        mostrar(r.datos.confirmada
+          ? 'RESERVA CONFIRMADA. Total: ' + r.datos.reserva.total + ' Bs'
+          : 'NO CONFIRMADA (' + r.codigo + '): ' + (r.datos.error || r.datos.message));
+      } catch (e) { mostrar('El motor no responde: ' + e.message); }
+    }
+  </script>
+</body>
+</html>
