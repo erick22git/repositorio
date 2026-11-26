@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Computo electoral</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 950px; margin: 20px auto; }
+    section { border: 1px solid #999; padding: 10px; margin-bottom: 15px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #999; padding: 5px; text-align: left; }
+    input, select { padding: 4px; }
+    .barra { background: #555; height: 14px; }
+    #mensaje { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Computo electoral - eleccion de Rector</h2>
+  <div id="mensaje"></div>
+
+  <section>
+    <h3>1. Iniciar sesion (API REST Laravel)</h3>
+    Email: <input id="email" value="jurado@example.com">
+    Password: <input id="password" type="password" value="password">
+    <button onclick="login()">Entrar</button>
+    <span id="usuario"></span>
+  </section>
+
+  <section>
+    <h3>2. Registrar acta (solo jurado o admin)</h3>
+    Mesa: <select id="mesa"></select>
+    Blancos: <input id="blancos" type="number" value="0" min="0" style="width:70px">
+    Nulos: <input id="nulos" type="number" value="0" min="0" style="width:70px">
+    <table>
+      <thead><tr><th>Candidato</th><th>Votos</th></tr></thead>
+      <tbody id="candidatos"></tbody>
+    </table>
+    <button onclick="registrarActa()">Registrar acta</button>
+  </section>
+
+  <section>
+    <h3>3. Resultados (GraphQL Node)</h3>
+    <button onclick="resultados()">Actualizar</button>
+    <p id="resumen"></p>
+    <table>
+      <thead><tr><th>Candidato</th><th>Votos</th><th>%</th><th></th></tr></thead>
+      <tbody id="resultados"></tbody>
+    </table>
+  </section>
+
+  <script>
+    const API = '/api';
+    const GRAPHQL = 'http://localhost:4000/graphql';
+    let token = '';
+
+    function mostrar(texto, error) {
+      const m = document.getElementById('mensaje');
+      m.textContent = texto;
+      m.style.color = error ? 'red' : 'green';
+    }
+
+    async function rest(metodo, ruta, cuerpo) {
+      const r = await fetch(API + ruta, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + token },
+        body: cuerpo ? JSON.stringify(cuerpo) : undefined
+      });
+      const datos = await r.json();
+      if (!r.ok) throw new Error('Error ' + r.status + ': ' + (datos.message || datos.mensaje || datos.status));
+      return datos;
+    }
+
+    async function login() {
+      try {
+        const d = await rest('POST', '/login', {
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value
+        });
+        token = d.token;
+        document.getElementById('usuario').textContent = d.usuario.name + ' (' + d.usuario.role + ')';
+        mostrar(d.mensaje, false);
+        await cargarDatos();
+      } catch (e) { mostrar(e.message, true); }
+    }
+
+    async function cargarDatos() {
+      const mesas = await rest('GET', '/mesas');
+      document.getElementById('mesa').innerHTML = mesas.map(m =>
+        `<option value="${m.id}">Mesa ${m.numero} - ${m.recinto} (${m.habilitados} hab.)${m.acta ? ' - YA COMPUTADA' : ''}</option>`
+      ).join('');
+      const candidatos = await rest('GET', '/candidatos?cargo=Rector');
+      document.getElementById('candidatos').innerHTML = candidatos.map(c =>
+        `<tr><td>${c.nombres} ${c.apellidos}</td>
+         <td><input type="number" min="0" value="0" data-id="${c.id}" class="voto" style="width:80px"></td></tr>`
+      ).join('');
+    }
+
+    async function registrarActa() {
+      if (!token) return mostrar('Primero inicie sesion', true);
+      const votos = [...document.querySelectorAll('.voto')].map(i => ({
+        candidato_id: Number(i.dataset.id),
+        cantidad: Number(i.value)
+      }));
+      try {
+        await rest('POST', '/actas', {
+          mesa_id: Number(document.getElementById('mesa').value),
+          cargo: 'Rector',
+          blancos: Number(document.getElementById('blancos').value),
+          nulos: Number(document.getElementById('nulos').value),
+          votos
+        });
+        mostrar('Acta registrada', false);
+        await cargarDatos();
+        await resultados();
+      } catch (e) { mostrar(e.message, true); }
+    }
+
+    async function resultados() {
+      const query = `{ resultados(cargo: "Rector") {
+        mesasTotal mesasComputadas avance validos blancos nulos situacion
+        candidatos { nombre votos porcentaje } } }`;
+      try {
+        const r = await fetch(GRAPHQL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const d = await r.json();
+        if (d.errors) throw new Error(d.errors[0].message);
+        const res = d.data.resultados;
+        document.getElementById('resumen').textContent =
+          `Mesas computadas: ${res.mesasComputadas} de ${res.mesasTotal} (${res.avance}%) - ` +
+          `validos ${res.validos}, blancos ${res.blancos}, nulos ${res.nulos}. ${res.situacion}`;
+        document.getElementById('resultados').innerHTML = res.candidatos.map(c =>
+          `<tr><td>${c.nombre}</td><td>${c.votos}</td><td>${c.porcentaje}</td>
+           <td style="width:40%"><div class="barra" style="width:${c.porcentaje}%"></div></td></tr>`
+        ).join('');
+      } catch (e) { mostrar('Resultados: ' + e.message, true); }
+    }
+
+    resultados();
+  </script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Inscripciones</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 5px; text-align: left; }
+    input { padding: 4px; }
+    #mensaje { margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Inscripcion de materias - gestion 2/2026</h2>
+
+  RU: <input id="ru" value="111111">
+  <button onclick="misMaterias()">Mis materias</button>
+  <div id="mensaje"></div>
+
+  <h3>Materias ofertadas</h3>
+  <table>
+    <thead><tr><th>Sigla</th><th>Materia</th><th>Docente</th><th>Horario</th><th>Cupo libre</th><th></th></tr></thead>
+    <tbody id="materias"></tbody>
+  </table>
+
+  <h3>Mis inscripciones</h3>
+  <table>
+    <thead><tr><th>Sigla</th><th>Materia</th><th>Horario</th><th></th></tr></thead>
+    <tbody id="mias"></tbody>
+  </table>
+
+  <script>
+    const URL_GRAPHQL = '/api/graphql';
+
+    async function graphql(query, variables) {
+      const r = await fetch(URL_GRAPHQL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ query, variables })
+      });
+      const datos = await r.json();
+      if (datos.errors) throw new Error(datos.errors[0].message);
+      return datos.data;
+    }
+
+    function mostrar(texto, error) {
+      const m = document.getElementById('mensaje');
+      m.textContent = texto;
+      m.style.color = error ? 'red' : 'green';
+    }
+
+    async function cargarMaterias() {
+      const d = await graphql('{ materias { sigla nombre docente horario disponibles } }');
+      document.getElementById('materias').innerHTML = d.materias.map(m =>
+        `<tr><td>${m.sigla}</td><td>${m.nombre}</td><td>${m.docente}</td><td>${m.horario}</td>
+         <td>${m.disponibles}</td><td><button onclick="inscribir('${m.sigla}')">Inscribir</button></td></tr>`
+      ).join('');
+    }
+
+    async function misMaterias() {
+      try {
+        const d = await graphql('query($ru:String!){ inscripcionesDe(ru:$ru){ materia { sigla nombre horario } } }',
+                                { ru: document.getElementById('ru').value });
+        document.getElementById('mias').innerHTML = d.inscripcionesDe.map(i =>
+          `<tr><td>${i.materia.sigla}</td><td>${i.materia.nombre}</td><td>${i.materia.horario}</td>
+           <td><button onclick="retirar('${i.materia.sigla}')">Retirar</button></td></tr>`
+        ).join('');
+      } catch (e) { mostrar(e.message, true); }
+    }
+
+    async function inscribir(sigla) {
+      try {
+        const d = await graphql('mutation($ru:String!,$s:String!){ inscribir(ru:$ru, sigla:$s){ estudiante materia { sigla } } }',
+                                { ru: document.getElementById('ru').value, s: sigla });
+        mostrar(d.inscribir.estudiante + ' inscrito en ' + d.inscribir.materia.sigla, false);
+      } catch (e) { mostrar(e.message, true); }
+      cargarMaterias();
+      misMaterias();
+    }
+
+    async function retirar(sigla) {
+      try {
+        const d = await graphql('mutation($ru:String!,$s:String!){ retirar(ru:$ru, sigla:$s) }',
+                                { ru: document.getElementById('ru').value, s: sigla });
+        mostrar(d.retirar, false);
+      } catch (e) { mostrar(e.message, true); }
+      cargarMaterias();
+      misMaterias();
+    }
+
+    cargarMaterias().catch(e => mostrar('No responde el servidor GraphQL: ' + e.message, true));
+  </script>
+</body>
+</html>

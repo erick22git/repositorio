@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Probar GraphQL</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; }
+    textarea, pre { width: 100%; font-family: monospace; }
+    pre { background: #f2f2f2; padding: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Probar GraphQL (sin internet)</h2>
+  <p>Consulta</p>
+  <textarea id="query" rows="8">{ obtenerCotizacion(fecha: "2025-04-04") { exito mensaje cotizacion { fecha cotizacion cotizacion_oficial } } }</textarea>
+  <p>Variables (JSON, opcional)</p>
+  <textarea id="variables" rows="3"></textarea>
+  <button onclick="enviar()">Ejecutar</button>
+  <pre id="salida"></pre>
+  <script>
+    async function enviar() {
+      const texto = document.getElementById('variables').value.trim();
+      const r = await fetch('/api/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ query: document.getElementById('query').value, variables: texto ? JSON.parse(texto) : null })
+      });
+      document.getElementById('salida').textContent = JSON.stringify(await r.json(), null, 2);
+    }
+  </script>
+</body>
+</html>

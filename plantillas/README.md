@@ -18,6 +18,10 @@ Cada plantilla **ya funciona tal cual**. Donde dice `AQUI LOGICA` va lo propio d
 | 10 | [Cliente web](10-cliente-web/README.md) | HTML + JS |
 | 11 | [Cliente de escritorio](11-cliente-forms-csharp/README.md) | C# Forms |
 | 12 | [Cliente de escritorio](12-cliente-java/README.md) | Java Swing |
+| 13 | [REST en Node](13-rest-node/README.md) | Node + Express |
+| 14 | [GraphQL en Laravel](14-graphql-laravel/README.md) | PHP / Laravel + webonyx |
+| 15 | [SOAP en Java](15-soap-java/README.md) | Java (sin librerías) |
+| 16 | [Proyectos de Visual Studio listos](16-proyectos-visual-studio/README.md) | C# (.sln) |
 
 ## Cambiar el nombre genérico "Recurso" por el de tu examen
 

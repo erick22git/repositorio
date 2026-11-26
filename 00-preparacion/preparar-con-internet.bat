@@ -9,14 +9,14 @@ REM --- Laravel 12 (la version del repo del curso) con rutas API y JWT
 call composer create-project laravel/laravel:^12.0 base-laravel
 cd base-laravel
 call php artisan install:api --no-interaction
-call composer require firebase/php-jwt
+call composer require firebase/php-jwt webonyx/graphql-php
 cd ..
 
 REM --- Node con las dependencias de GraphQL (comandos de la hoja del docente)
 mkdir base-graphql
 cd base-graphql
 call npm init -y
-call npm install express express-graphql graphql mysql2 sequelize
+call npm install express@4 express-graphql@0.12.0 graphql@15 mysql2 sequelize cors
 call npm install -D nodemon
 cd ..
 

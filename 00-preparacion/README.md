@@ -3,6 +3,7 @@
 [← Volver al índice](../README.md)
 
 ## Índice
+- [Sin internet: bases listas en el repositorio](sin-internet/README.md)
 - [A. Qué instalar](#a-qué-instalar)
 - [B. Antes del examen, con internet](#b-antes-del-examen-con-internet)
 - [C. Comprobar que todo está](#c-comprobar-que-todo-está)
@@ -18,7 +19,7 @@
 | XAMPP | MySQL y PHP | Encender **MySQL** en el panel |
 | Composer | Laravel | Al instalar, apuntar al PHP de XAMPP |
 | Node.js | GraphQL | Trae `npm` |
-| `jgroups-5.x.Final.jar` | JGroups | Guardarlo en `C:\libs\jgroups\` |
+| `jgroups-5.x.Final.jar` | JGroups | Ya viene en `00-preparacion/sin-internet/libs/`. O guardarlo en `C:\libs\jgroups\` |
 | Postman / Insomnia / SoapUI | Probar servicios | Opcional |
 
 En `C:\xampp\php\php.ini` quita el `;` de estas líneas: `extension=zip`, `extension=fileinfo`, `extension=pdo_mysql`, `extension=soap`.
@@ -26,6 +27,12 @@ En `C:\xampp\php\php.ini` quita el `;` de estas líneas: `extension=zip`, `exten
 > Laravel 12 pide PHP 8.2 o superior. Comprueba con `php -v` que sea el PHP que esperas.
 
 ## B. Antes del examen, con internet
+
+> **Si el docente deja usar internet un rato en el examen**, sigue el [Camino A](sin-internet/README.md#camino-a--con-internet-permitido-lo-que-haría-el-docente): instalar una vez y copiar la carpeta para cada proyecto.
+>
+> **Ya no es obligatorio.** La carpeta [`sin-internet`](sin-internet/README.md) trae `base-laravel.zip` y `base-node.zip` con todas las dependencias descargadas y el jar de JGroups. Basta con clonar el repositorio. **[EXTRA]**
+>
+> Ojo si lo haces a mano: `graphql` y `express` van **con versión** (`graphql@15`, `express@4`). Sin versión npm instala `graphql` 16 y `express-graphql` falla con `ERESOLVE`.
 
 La forma corta: doble clic en [`preparar-con-internet.bat`](preparar-con-internet.bat) **[EXTRA]**.
 
@@ -42,7 +49,7 @@ REM 2) Proyecto Node base   (comandos [INGE])
 mkdir C:\examen\bases\base-graphql
 cd C:\examen\bases\base-graphql
 npm init -y
-npm install express express-graphql graphql mysql2 sequelize
+npm install express@4 express-graphql@0.12.0 graphql@15 mysql2 sequelize cors
 npm install -D nodemon
 
 REM 3) Instalador de Laravel de la hoja del docente [INGE] (para crear proyectos igual necesita internet)
@@ -75,6 +82,8 @@ Ensayo obligatorio **con el WiFi apagado**: copia `base-laravel` y ejecuta `php 
 > **Regla de oro: cada proyecto Laravel usa SU PROPIA base de datos.** `migrate:fresh` borra **todas** las tablas de la base.
 
 ### D.2 Proyecto Laravel nuevo
+> **Atajo si no preparaste nada:** `C:\guia\00-preparacion\sin-internet\nuevo-laravel.bat mi-proyecto` deja en `C:\examen\mi-proyecto` un Laravel 12 con `vendor`, Sanctum, `firebase/php-jwt` y `webonyx/graphql-php` ya instalados y el `.env` listo. Ver [sin-internet](sin-internet/README.md).
+
 - **Paso 1.** Copiar la carpeta `C:\examen\bases\base-laravel` completa (con `vendor`) y renombrarla (ej. `central-rest`).
 - **Paso 2.** Abrirla en VS Code.
 - **Paso 3.** Abrir `.env`, quitar los `#` y dejar así:
@@ -111,6 +120,8 @@ Sin internet puede mostrar un error al intentar descargar Sanctum. Revisa si igu
 - **Paso 3.** `php artisan route:list --path=api` debe mostrar tus rutas.
 
 ### D.3 Proyecto Node (GraphQL) nuevo
+> **Atajo:** `C:\guia\00-preparacion\sin-internet\nuevo-node.bat mi-graphql` deja un proyecto con `express@4`, `express-graphql@0.12.0`, `graphql@15`, `mysql2`, `sequelize`, `cors` y `nodemon` en `C:\examen\mi-graphql`.
+
 - **Paso 1.** Copiar `C:\examen\bases\base-graphql` y renombrarla.
 - **Paso 2.** Pegar `server.js`, `schema.js`, `database.js`.
 - **Paso 3.** En `package.json`, dentro de `"scripts"`: `"dev": "nodemon server.js"`.

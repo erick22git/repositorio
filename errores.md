@@ -32,12 +32,17 @@ Mira siempre las **primeras líneas** de `storage/logs/laravel.log`.
 | `Provided key is too short` | `JWT_SECRET` de 32 caracteres o más |
 | 401 siempre | Cabecera `Authorization: Bearer TOKEN`; mismo secreto en los dos lados; token vencido |
 | Cambié `.env` y no se nota | `php artisan config:clear` y reiniciar `serve` |
-| `composer`: `requires php >= ...` | La versión de PHP no coincide con la del proyecto: revisar `php -v` |
+| `composer`: `requires php >= ...` | La versión de PHP no coincide con la del proyecto: revisar `php -v`. La base de `sin-internet` pide **PHP 8.2 o más** (XAMPP 8.2 sirve) |
+| `Class "GraphQL\GraphQL" not found` | Falta `webonyx/graphql-php`: usar la base de [sin-internet](00-preparacion/sin-internet/README.md) o `composer require webonyx/graphql-php` |
+| `The selected salida id is invalid` (422) | La regla `exists:tabla,id` no encontró el registro padre: créalo primero |
 
 ## Node / GraphQL
 | Mensaje | Solución |
 |---|---|
-| `Cannot find module 'express'` | Falta `node_modules`: copiar tu base preparada |
+| `Cannot find module 'express'` | Falta `node_modules`: copiar tu base preparada o usar `sin-internet\nuevo-node.bat` |
+| `npm ERR! ERESOLVE ... peer graphql@"^14.7.0 \|\| ^15.3.0"` | `npm install graphql` trae la 16 y `express-graphql` solo acepta hasta la 15: `npm install graphql@15 express-graphql@0.12.0` |
+| `fetch is not defined` | Node 16 o menor: actualizar a Node 18+ o usar el módulo `http`/`axios` |
+| GraphQL responde 200 pero con `errors` | Es normal: GraphQL no usa códigos HTTP para errores. Leer `errors[0].message` |
 | `EADDRINUSE` | El puerto 4000 está ocupado |
 | `ER_BAD_DB_ERROR` | Crear la base en phpMyAdmin |
 | `ECONNREFUSED ...3306` | Encender MySQL |

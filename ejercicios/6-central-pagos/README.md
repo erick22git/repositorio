@@ -4,6 +4,7 @@
 
 | Versión | Me piden… |
 |---|---|
+| [0](#versión-0--con-el-contrato-exacto-del-enunciado) | **Contrato exacto del enunciado** (`verDeuda`, `PagarDeuda`) |
 | [1](#versión-1--consultar-y-pagar) | Consultar deudas y pagar una |
 | [2](#versión-2--pagar-todo) | Pagar todas |
 | [3](#versión-3--otra-empresa-y-total) | Una empresa más y total |
@@ -27,6 +28,290 @@ El cliente de escritorio habla **solo SOAP** con una central. La central verific
 
 ## Orden de arranque
 SEGIP → CESSA → ELAPAS → SOAP → Forms.
+
+---
+
+## Versión 0 · Con el contrato exacto del enunciado
+**[PRÁCTICA "Web SOAP REST"]** · Las versiones 1 a 4 de abajo **simplifican** el contrato (`consultarDeudas(ci)`, `pagar(empresa, id)` y un SEGIP solo con `nombre`). Si el examen copia el enunciado de la práctica, **hay que respetar estos nombres y parámetros**:
+
+> - SEGIP (**GraphQL, Node**): recurso persona con `CI, Nombres, PrimerApellido, SegundoApellido`; permitir buscar por CI.
+> - ServidorPagos (**SOAP, C#**): `Deuda[] verDeuda(String CI, String primerApellido, String segundoApellido, String nombres)` y `PagarDeuda(Deuda c)`.
+> - CESSA y ELAPAS (**REST, Laravel**): recurso Facturas.
+> - Cliente Pagos (**C#**): introduce CI, nombres, primer y segundo apellido; botón **Obtener el Detalle de Deudas**; el SEGIP verifica que exista **y que los datos sean correctos**; elige una deuda y paga.
+
+Archivos en la carpeta `v0-oficial/`. Las empresas son **las mismas** de la versión 1 (`empresa-rest-laravel`, dos copias en 8001 y 8002).
+
+| Pieza | Archivo | Cambia respecto a la versión 1 |
+|---|---|---|
+| SEGIP | `v0-oficial/segip-graphql/schema.js` (+ `server.js` y `package.json` de la versión 1) | Campos `ci, nombres, primerApellido, segundoApellido` |
+| ServidorPagos | `v0-oficial/servidor-pagos-soap/App_Code/Servicio.cs` | `verDeuda(CI, primerApellido, segundoApellido, nombres)` y `PagarDeuda(Deuda c)`; compara nombres y apellidos con el SEGIP |
+| Cliente | `v0-oficial/cliente-forms/Form1.cs` | 4 cajas y los botones del enunciado; referencia **`srPagos`** |
+
+Orden: SEGIP (`npm run dev`) → CESSA (`serve --port=8001`) → ELAPAS (`serve --port=8002`) → ServidorPagos (`Ctrl + F5`) → Cliente (`F5`).
+
+### segip-graphql/schema.js
+```js
+const { GraphQLObjectType, GraphQLString, GraphQLSchema, GraphQLList, GraphQLNonNull } = require('graphql');
+
+// SEGIP: recurso persona con los campos del enunciado. Datos en memoria.
+const personas = [
+  { ci: '11021654', nombres: 'Juan', primerApellido: 'Perez', segundoApellido: 'Segovia' },
+  { ci: '5551234',  nombres: 'Ana',  primerApellido: 'Rojas', segundoApellido: 'Flores' },
+  { ci: '7778899',  nombres: 'Luis', primerApellido: 'Vargas', segundoApellido: '' }
+];
+
+const PersonaType = new GraphQLObjectType({
+  name: 'Persona',
+  fields: {
+    ci:              { type: GraphQLString },
+    nombres:         { type: GraphQLString },
+    primerApellido:  { type: GraphQLString },
+    segundoApellido: { type: GraphQLString }
+  }
+});
+
+const RootQuery = new GraphQLObjectType({
+  name: 'RootQueryType',
+  fields: {
+    // permitir buscar por CI (lo pide el enunciado)
+    persona: {
+      type: PersonaType,
+      args: { ci: { type: new GraphQLNonNull(GraphQLString) } },
+      resolve: (parent, { ci }) => personas.find(p => p.ci === ci.trim()) || null
+    },
+    personas: {
+      type: new GraphQLList(PersonaType),
+      resolve: () => personas
+    }
+  }
+});
+
+module.exports = new GraphQLSchema({ query: RootQuery });
+```
+
+Prueba en `http://localhost:4000/graphql`:
+```graphql
+{ persona(ci: "11021654") { ci nombres primerApellido segundoApellido } }
+```
+
+### servidor-pagos-soap/App_Code/Servicio.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Text;
+using System.Web.Script.Serialization;
+using System.Web.Services;
+using System.Web.Services.Protocols;
+
+// SERVIDOR DE PAGOS (contrato del enunciado):
+//   Deuda[] verDeuda(String CI, String primerApellido, String segundoApellido, String nombres)
+//   PagarDeuda(Deuda c)
+[WebService(Namespace = "http://tempuri.org/")]
+[WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
+public class Servicio : System.Web.Services.WebService
+{
+    private const string SEGIP = "http://localhost:4000/graphql";
+
+    private static readonly Dictionary<string, string> EMPRESAS = new Dictionary<string, string>
+    {
+        { "CESSA",  "http://localhost:8001/api/facturas" },
+        { "ELAPAS", "http://localhost:8002/api/facturas" }
+    };
+
+    [WebMethod]
+    public Deuda[] verDeuda(string CI, string primerApellido, string segundoApellido, string nombres)
+    {
+        if (string.IsNullOrEmpty(CI) || string.IsNullOrEmpty(nombres) || string.IsNullOrEmpty(primerApellido))
+        {
+            throw new SoapException("Debe llenar CI, nombres y primer apellido", SoapException.ClientFaultCode);
+        }
+        VerificarSegip(CI.Trim(), nombres, primerApellido, segundoApellido);
+
+        var deudas = new List<Deuda>();
+        foreach (var empresa in EMPRESAS)
+        {
+            string json = Llamar(empresa.Value + "?ci=" + Uri.EscapeDataString(CI.Trim()), "GET", null);
+            foreach (var f in new JavaScriptSerializer().Deserialize<List<Factura>>(json))
+            {
+                deudas.Add(new Deuda { empresa = empresa.Key, idFactura = f.id, ci = f.ci, periodo = f.periodo, monto = f.monto });
+            }
+        }
+        return deudas.ToArray();
+    }
+
+    [WebMethod]
+    public string PagarDeuda(Deuda c)
+    {
+        string url;
+        if (c == null || !EMPRESAS.TryGetValue(c.empresa ?? "", out url))
+        {
+            throw new SoapException("Deuda invalida", SoapException.ClientFaultCode);
+        }
+        // la empresa responde 409 si ya estaba pagada
+        Llamar(url + "/" + c.idFactura, "PATCH", "{\"estado\":\"pagada\"}");
+        return "Pago registrado en " + c.empresa + ": factura " + c.idFactura + " por Bs " + c.monto;
+    }
+
+    // el SEGIP verifica que exista el CI y que los datos coincidan
+    private void VerificarSegip(string ci, string nombres, string primerApellido, string segundoApellido)
+    {
+        var consulta = new
+        {
+            query = "query($ci: String!) { persona(ci: $ci) { nombres primerApellido segundoApellido } }",
+            variables = new { ci = ci }
+        };
+        string json = Llamar(SEGIP, "POST", new JavaScriptSerializer().Serialize(consulta));
+        var respuesta = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
+        var data = respuesta["data"] as Dictionary<string, object>;
+        var persona = data == null ? null : data["persona"] as Dictionary<string, object>;
+        if (persona == null)
+        {
+            throw new SoapException("SEGIP: el CI " + ci + " no esta registrado", SoapException.ClientFaultCode);
+        }
+        if (!Igual(persona["nombres"], nombres) || !Igual(persona["primerApellido"], primerApellido)
+            || !Igual(persona["segundoApellido"], segundoApellido))
+        {
+            throw new SoapException("SEGIP: los datos no coinciden con el CI", SoapException.ClientFaultCode);
+        }
+    }
+
+    private static bool Igual(object a, string b)
+    {
+        return string.Equals(Convert.ToString(a).Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string Llamar(string url, string metodo, string cuerpo)
+    {
+        try
+        {
+            using (var web = new WebClient { Encoding = Encoding.UTF8 })
+            {
+                web.Headers["Accept"] = "application/json";
+                web.Headers["Content-Type"] = "application/json";
+                return metodo == "GET" ? web.DownloadString(url) : web.UploadString(url, metodo, cuerpo);
+            }
+        }
+        catch (WebException ex)
+        {
+            var r = ex.Response as HttpWebResponse;
+            if (r == null) throw new SoapException("No responde: " + url, SoapException.ServerFaultCode);
+            if ((int)r.StatusCode == 409) throw new SoapException("La factura ya fue pagada", SoapException.ClientFaultCode);
+            throw new SoapException("Error HTTP " + (int)r.StatusCode + " en " + url, SoapException.ClientFaultCode);
+        }
+    }
+}
+
+public class Factura
+{
+    public int id { get; set; }
+    public string ci { get; set; }
+    public string periodo { get; set; }
+    public double monto { get; set; }
+}
+
+public class Deuda
+{
+    public string empresa { get; set; }
+    public int idFactura { get; set; }
+    public string ci { get; set; }
+    public string periodo { get; set; }
+    public double monto { get; set; }
+}
+```
+
+### cliente-forms/Form1.cs
+```csharp
+// CLIENTE PAGOS: CI, nombres y apellidos -> "Obtener el Detalle de Deudas" -> elegir -> pagar
+// ANTES DE PEGAR: referencia de servicio al ServidorPagos con el nombre  srPagos
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1   // <-- dejar el nombre que tenga TU proyecto
+{
+    public partial class Form1 : Form
+    {
+        TextBox txtCi, txtNombres, txtPrimer, txtSegundo;
+        DataGridView tabla;
+        Label lblEstado;
+
+        public Form1()
+        {
+            InitializeComponent();
+            ArmarPantalla();
+        }
+
+        void ArmarPantalla()
+        {
+            Text = "Cliente Pagos";
+            ClientSize = new Size(620, 420);
+
+            txtCi = Caja("CI", 10, "11021654");
+            txtNombres = Caja("Nombres", 38, "Juan");
+            txtPrimer = Caja("Primer apellido", 66, "Perez");
+            txtSegundo = Caja("Segundo apellido", 94, "Segovia");
+
+            var detalle = new Button { Text = "Obtener el Detalle de Deudas", Location = new Point(360, 8), Width = 240, Height = 30 };
+            detalle.Click += (s, e) => Ejecutar(Consultar);
+            var pagar = new Button { Text = "Pagar la deuda seleccionada", Location = new Point(360, 44), Width = 240, Height = 30 };
+            pagar.Click += (s, e) => Ejecutar(Pagar);
+
+            lblEstado = new Label { Location = new Point(360, 92), AutoSize = true, Text = "Llene sus datos" };
+            tabla = new DataGridView
+            {
+                Location = new Point(10, 130), Size = new Size(600, 280), ReadOnly = true,
+                AllowUserToAddRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false
+            };
+            Controls.AddRange(new Control[] { detalle, pagar, lblEstado, tabla });
+        }
+
+        TextBox Caja(string titulo, int y, string valor)
+        {
+            Controls.Add(new Label { Text = titulo, Location = new Point(10, y + 3), AutoSize = true });
+            var t = new TextBox { Location = new Point(130, y), Width = 210, Text = valor };
+            Controls.Add(t);
+            return t;
+        }
+
+        // los SoapException del servidor llegan aqui como FaultException
+        void Ejecutar(Action accion)
+        {
+            try { accion(); }
+            catch (System.ServiceModel.FaultException ex) { lblEstado.Text = "Error"; MessageBox.Show(ex.Message, "Error"); }
+            catch (Exception ex) { lblEstado.Text = "Error"; MessageBox.Show("No se pudo conectar: " + ex.Message, "Error"); }
+        }
+
+        void Consultar()
+        {
+            var central = new srPagos.ServicioSoapClient();
+            srPagos.Deuda[] deudas = central.verDeuda(txtCi.Text.Trim(), txtPrimer.Text.Trim(), txtSegundo.Text.Trim(), txtNombres.Text.Trim());
+            tabla.DataSource = deudas;
+            lblEstado.Text = deudas.Length == 0 ? "No tiene deudas" : deudas.Length + " deuda(s)";
+        }
+
+        void Pagar()
+        {
+            if (tabla.CurrentRow == null) { MessageBox.Show("Elija una deuda"); return; }
+            var deuda = (srPagos.Deuda)tabla.CurrentRow.DataBoundItem;
+            var central = new srPagos.ServicioSoapClient();
+            MessageBox.Show(central.PagarDeuda(deuda));
+            Consultar();
+        }
+    }
+}
+```
+
+### Pruebas
+| Datos | Resultado |
+|---|---|
+| `11021654` · Juan · Perez · Segovia | Lista de facturas pendientes de CESSA y ELAPAS |
+| `11021654` · Juan · Perez · **Rojas** | "SEGIP: los datos no coinciden con el CI" |
+| `999999` | "SEGIP: el CI 999999 no esta registrado" |
+| Pagar una deuda | "Pago registrado en CESSA: factura …" y desaparece de la lista |
+| ELAPAS apagado | "No responde: http://localhost:8002/…" |
+
+**Cómo defenderlo:** "Respeté el contrato del enunciado: `verDeuda` recibe los cuatro datos y `PagarDeuda` recibe el objeto `Deuda` completo. El servidor SOAP es intermediario: primero GraphQL al SEGIP (identidad), después REST a cada empresa (facturas)."
 
 ---
 
