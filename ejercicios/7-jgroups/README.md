@@ -1,5 +1,7 @@
 # Ejercicio 7 · JGroups (comunicación en grupo)
 
+si
+
 [← Ejercicios](../README.md) · [Índice](../../README.md) · **[PRÁCTICA 3]**
 
 | Versión | Me piden… |
