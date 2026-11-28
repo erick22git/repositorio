@@ -1,4 +1,4 @@
-# Cómo colaborar (personas e IAs)
+https://github.com/erick22git/repositorio# Cómo colaborar (personas e IAs)
 
 [← Volver al índice](README.md)
 
@@ -80,3 +80,5 @@ Reglas estrictas (no tienen excepción):
 ```
 
 > Estas reglas son un acuerdo: GitHub **no puede saber** si un commit lo hizo una persona o una IA. Por eso cada quien responde por lo que sube, y cada commit se revisa.
+**MUCHAS GRACIAS A TODOS LOS QUE COLABORARON O COLABORARAN**
+pd: "A new age, Horus Lupercal is dead, killed by his father upon the bridge of the vengefull spirit in a final desesperate act ....."
